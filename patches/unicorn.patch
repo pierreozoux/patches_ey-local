@@ -1,0 +1,39 @@
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x .gitignore -x .DS_Store engineyard-local.orig/config/dna.json /Users/PierreOzoux/.rbenv/versions/1.9.3-p194/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/dna.json
+--- engineyard-local.orig/config/dna.json	2013-07-09 11:17:54.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p194/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/dna.json	2013-07-09 11:18:42.000000000 +0100
+@@ -53,7 +53,7 @@
+         "memcached",
+         "monit",
+         "nginx",
+-        "passenger3"
++        "unicorn"
+       ],
+       "vhosts": [
+         {
+@@ -86,7 +86,7 @@
+   ],
+   "environment": {
+     "name": "eylocal",
+-    "stack": "nginx_passenger3",
++    "stack": "nginx_unicorn",
+     "framework_env": "production"
+   },
+   "aws_secret_id": "",
+@@ -206,7 +206,7 @@
+           "key": "metadata"
+         },
+         {
+-          "key": "passenger3"
++          "key": "unicorn"
+         }
+       ],
+       "mailserver": "smtp.engineyard.com",
+@@ -214,7 +214,7 @@
+ 
+       ],
+       "stats_password": "abc123unme",
+-      "stack_name": "nginx_passenger3",
++      "stack_name": "nginx_unicorn",
+       "backup_window": 10,
+       "backup_bucket": "",
+       "db_stack_name": "mysql5_1",

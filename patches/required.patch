@@ -1,0 +1,111 @@
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x patch_recipes.sh -x .gitignore -x .DS_Store engineyard-local.orig/config/patches/chef-ey-perso.patch /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/patches/chef-ey-perso.patch
+--- engineyard-local.orig/config/patches/chef-ey-required.patch	1970-01-01 01:00:00.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/patches/chef-ey-required.patch	2013-07-08 18:06:06.000000000 +0100
+@@ -0,0 +1,12 @@
++diff -rupN recipes.orig/cookbooks/ey-base/libraries/instance_size.rb recipes/cookbooks/ey-base/libraries/instance_size.rb
++--- recipes.orig/cookbooks/ey-base/libraries/instance_size.rb	2012-11-06 19:50:15.000000000 +0000
+++++ recipes/cookbooks/ey-base/libraries/instance_size.rb	2013-07-02 16:18:05.000000000 +0100
++@@ -1,7 +1,7 @@
++ class Chef
++   class Node
++     def ec2_instance_size
++-      @ec2_instance_size ||= open("http://169.254.169.254/latest/meta-data/instance-type").read
+++      @ec2_instance_size ||= "m1.small"
++     end
++   end
++ end
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x patch_recipes.sh -x .gitignore -x .DS_Store engineyard-local.orig/config/settings.yml /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/settings.yml
+--- engineyard-local.orig/config/settings.yml	2013-07-08 17:53:25.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/settings.yml	2013-07-02 12:08:13.000000000 +0100
+@@ -7,6 +7,7 @@
+   :network_tag_default: no-networks-defined
+   :patches:
+     - chef-ey-1.1.336.patch
++    - chef-ey-required.patch
+ 
+ :rvm:
+   :ruby_env_const: RVM_RUBY
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x patch_recipes.sh -x .gitignore -x .DS_Store engineyard-local.orig/lib/engineyard-local/middleware/bundle.rb /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/lib/engineyard-local/middleware/bundle.rb
+--- engineyard-local.orig/lib/engineyard-local/middleware/bundle.rb	2013-07-08 17:53:25.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/lib/engineyard-local/middleware/bundle.rb	2013-07-08 18:16:42.000000000 +0100
+@@ -24,7 +24,7 @@ module Engineyard
+               "sudo mkdir -p #{project_dir} /data/#{Engineyard::Local.config['app_name']}/",
+               "if [[ ! -e /data/#{Engineyard::Local.config['app_name']}/current ]]; then sudo ln -sf #{project_dir} /data/#{Engineyard::Local.config['app_name']}/current; fi",
+               "if [[ ! -e /data/#{Engineyard::Local.config['app_name']}/current/public ]]; then sudo mkdir -p /data/#{Engineyard::Local.config['app_name']}/current/public; fi",
+-              if_gemfile_exists("sudo bundle install")
++              if_gemfile_exists("bundle install --path /data/seedrs/shared/bundled_gems --binstubs /data/seedrs/current/ey_bundler_binstubs --without 'test development' --deployment")
+             ]
+         end
+ 
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x patch_recipes.sh -x .gitignore -x .DS_Store engineyard-local.orig/lib/engineyard-local/middleware/chef.rb /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/lib/engineyard-local/middleware/chef.rb
+--- engineyard-local.orig/lib/engineyard-local/middleware/chef.rb	2013-07-08 17:53:25.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/lib/engineyard-local/middleware/chef.rb	2013-07-08 18:16:03.000000000 +0100
+@@ -14,6 +14,8 @@ module Engineyard
+         def call(env)
+           @env[:ui].info I18n.t("eylocal.setup.chef")
+           copy_patches(env)
++          p "upload and patch recipes"
++          p commands
+           ssh_exec!(env, commands)
+           @app.call(env)
+         end
+@@ -27,6 +29,7 @@ module Engineyard
+           ssh_exec!(env, ["mkdir -p #{patchdir}"])
+ 
+           Local.config[:box_defaults][:patches].each do |p|
++            p "patch #{p}"
+             from = File.expand_path("config/patches/#{p}", Engineyard::Local.project_root)
+             ssh_upload!(env, from, File.join(patchdir,p))
+           end
+@@ -34,8 +37,8 @@ module Engineyard
+ 
+         def commands
+           rvm_env +
++          ensure_that_recipes_are_installed +
+           [
+-            ensure_that_recipes_are_installed,
+             "cd /etc/chef",
+             "sudo env PATH=/usr/local/ey_resin/bin:/sbin:/bin:/usr/sbin:/usr/bin chef-solo -j /etc/chef/dna.json -c /etc/chef/solo.rb",
+             "if [[ ! -e /usr/bin/rake ]]; then sudo ln -s /usr/bin/rake19 /usr/bin/rake; fi",
+@@ -44,7 +47,18 @@ module Engineyard
+         end
+ 
+         def ensure_that_recipes_are_installed
+-          "if [[ ! -d /etc/chef/recipes ]]; then curl -s #{cookbook_uri} > /tmp/chef.tar#{cookbook_suffix}; sudo mkdir -p /etc/chef/recipes && cd /etc/chef/recipes && sudo tar #{tar_flags} /tmp/chef.tar#{cookbook_suffix}; sudo patch -p1 < /tmp/eylocal_patches/* >& /dev/null; sudo touch #{Engineyard::Local::Middleware::Cookbooks::COOKBOOK_VERSION_FILE}; sudo chown vagrant #{Engineyard::Local::Middleware::Cookbooks::COOKBOOK_VERSION_FILE}; echo \"#{cookbook_version}\" > #{Engineyard::Local::Middleware::Cookbooks::COOKBOOK_VERSION_FILE}; rm /tmp/chef.tar#{cookbook_suffix}; fi"
++          # Upload and patch each run
++          commands_to_add = [
++            "sudo rm -rf /etc/chef/recipes",
++            "curl -s #{cookbook_uri} > /tmp/chef.tar#{cookbook_suffix}; sudo mkdir -p /etc/chef/recipes && cd /etc/chef/recipes && sudo tar #{tar_flags} /tmp/chef.tar#{cookbook_suffix}"
++          ]
++          Local.config[:box_defaults][:patches].each do |p|
++            commands_to_add += [ "sudo patch -p1 < /tmp/eylocal_patches/#{p}" ]
++          end
++
++          commands_to_add += [ "sudo touch #{Engineyard::Local::Middleware::Cookbooks::COOKBOOK_VERSION_FILE}; sudo chown vagrant #{Engineyard::Local::Middleware::Cookbooks::COOKBOOK_VERSION_FILE}; echo \"#{cookbook_version}\" > #{Engineyard::Local::Middleware::Cookbooks::COOKBOOK_VERSION_FILE}; rm /tmp/chef.tar#{cookbook_suffix}" ]
++
++          return commands_to_add
+         end
+ 
+         def run_custom_chef_in_application_if_it_exists
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x patch_recipes.sh -x .gitignore -x .DS_Store engineyard-local.orig/lib/engineyard-local/middleware/rails/db.rb /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/lib/engineyard-local/middleware/rails/db.rb
+--- engineyard-local.orig/lib/engineyard-local/middleware/rails/db.rb	2013-07-08 17:53:26.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/lib/engineyard-local/middleware/rails/db.rb	2013-07-03 17:16:00.000000000 +0100
+@@ -19,8 +19,8 @@ module Engineyard
+ 
+           def commands
+               [ "cd #{project_dir}",
+-                if_task_exists("db:create"),
+-                if_task_exists("db:migrate") ]
++                if_task_exists("db:reset")
++              ]
+           end
+ 
+           # if there's a Rakefile, and rake -T contains the task we're looking for
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x .gitignore -x .DS_Store engineyard-local.orig/patch_recipes.sh /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/patch_recipes.sh
+--- engineyard-local.orig/patch_recipes.sh  1970-01-01 01:00:00.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p392/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/patch_recipes.sh  2013-07-08 18:44:29.000000000 +0100
+@@ -0,0 +1,4 @@
++#!/bin/bash
++
++diff -rupN recipes.orig/ recipes/ > config/patches/my-chef-ey.patch
++echo "don't forget to add my-chef-ey.patch to config/settings.yml"

@@ -1,0 +1,33 @@
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x .gitignore -x .DS_Store engineyard-local.orig/config/patches/chef-ey-unicorn.patch /Users/PierreOzoux/.rbenv/versions/1.9.3-p194/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/patches/chef-ey-unicorn.patch
+--- engineyard-local.orig/config/patches/chef-ey-rack1.4.5.patch	1970-01-01 01:00:00.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p194/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/patches/chef-ey-rack1.4.5.patch	2013-07-09 11:20:20.000000000 +0100
+@@ -0,0 +1,18 @@
++diff -rupN recipes.orig/cookbooks/unicorn/recipes/install.rb recipes/cookbooks/unicorn/recipes/install.rb
++--- recipes.orig/cookbooks/unicorn/recipes/install.rb	2012-11-06 19:50:15.000000000 +0000
+++++ recipes/cookbooks/unicorn/recipes/install.rb	2013-07-09 11:20:09.000000000 +0100
++@@ -6,3 +6,14 @@ gem_package 'unicorn' do
++   version "4.1.1"
++   action :install
++ end
+++
+++## Rack 1.5.2 is on the EY basebox and breaks unicorn
+++gem_package "rack" do
+++  version "1.5.2"
+++  action :remove
+++end
+++
+++gem_package "rack" do
+++  version "1.4.5"
+++  action :install
+++end
+diff -rupN -x .yardoc -x yardoc -x diff_recipes -x 'recipes*' -x .gitignore -x .DS_Store engineyard-local.orig/config/settings.yml /Users/PierreOzoux/.rbenv/versions/1.9.3-p194/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/settings.yml
+--- engineyard-local.orig/config/settings.yml	2013-07-09 11:17:54.000000000 +0100
++++ /Users/PierreOzoux/.rbenv/versions/1.9.3-p194/lib/ruby/gems/1.9.1/gems/engineyard-local-1.0.2/config/settings.yml	2013-07-09 11:21:04.000000000 +0100
+@@ -8,6 +8,7 @@
+   :patches:
+     - chef-ey-1.1.336.patch
+     - chef-ey-required.patch
++    - chef-ey-rack1.4.5.patch
+ 
+ :rvm:
+   :ruby_env_const: RVM_RUBY
